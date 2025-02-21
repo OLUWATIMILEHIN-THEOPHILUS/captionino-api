@@ -158,6 +158,7 @@ def save_user(request: Request, current_user = Depends(oauth2.get_current_supaba
     # extract user details
     email = current_user.user.email
     google_id = current_user.user.user_metadata['sub']
+    avatar_url = current_user.user.user_metadata['avatar_url']
 
     # check if user exists in DB
     existing_user = db.query(models.User).filter_by(email=email).first()
@@ -165,7 +166,7 @@ def save_user(request: Request, current_user = Depends(oauth2.get_current_supaba
         return {"message": "User already exists!"}    
 
     # save new user
-    new_user = models.User(email=email, google_id=google_id)
+    new_user = models.User(email=email, google_id=google_id, avatar_url=avatar_url)
     db.add(new_user)
     db.commit()
     db.refresh(new_user)

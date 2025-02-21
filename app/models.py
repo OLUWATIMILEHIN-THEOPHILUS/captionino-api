@@ -13,6 +13,7 @@ class User(Base):
     password = Column(String, nullable=True)    # can be empty for Google users
     created = Column(TIMESTAMP(timezone=True), nullable=False, server_default=text('now()'))
     google_id = Column(String, unique=True, nullable=True)  # Google ID for Google users
+    avatar_url = Column(String, nullable=True)  # Avatar url for Google users
 
     def __repr__(self):
         return f"User(email={self.email})"
