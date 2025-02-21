@@ -25,6 +25,6 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(user.router)
 
-@app.get("/home", status_code=status.HTTP_200_OK)
+@app.head("/home", status_code=status.HTTP_200_OK)
 def home_page():
     return ({"Welcome to Captionino by Timi"})
