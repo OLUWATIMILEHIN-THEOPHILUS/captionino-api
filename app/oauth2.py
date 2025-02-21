@@ -64,7 +64,14 @@ async def get_current_supabase_user(token: str = Security(security)):
     except Exception:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authentication")
 
+# Combined get user logic
+def get_all_current_user():
+    try:
+        get_current_user()
+    except:
+        get_current_supabase_user()
 
+# For password reset
 def create_reset_token(email: dict):
     to_encode = email.copy()
 

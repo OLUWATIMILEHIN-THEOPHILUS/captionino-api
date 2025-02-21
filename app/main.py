@@ -1,6 +1,6 @@
 # App entry point here.
 from fastapi import FastAPI, status, Depends
-from .routers import auth, user
+from .routers import auth, user, google_auth, supabase_auth, password
 from starlette.middleware.sessions import SessionMiddleware
 from .config import settings
 from .oauth2 import get_current_supabase_user
@@ -24,6 +24,9 @@ app.add_middleware(
 
 app.include_router(auth.router)
 app.include_router(user.router)
+app.include_router(google_auth.router)
+app.include_router(supabase_auth.router)
+app.include_router(password.router)
 
 @app.head("/home", status_code=status.HTTP_200_OK)
 def home_page():

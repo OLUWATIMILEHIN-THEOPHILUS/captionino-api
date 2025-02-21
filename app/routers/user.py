@@ -19,7 +19,7 @@ def get_all_users(db: Session = Depends(get_db)):
     }
 
 @router.get("/get_user/{id}", status_code=status.HTTP_200_OK, response_model=dict)
-def get_user(id: UUID, db: Session = Depends(get_db), current_user: int = Depends(oauth2.get_current_user)):
+def get_user(id: UUID, db: Session = Depends(get_db), current_user: int = Depends(oauth2.get_all_current_user)):
     user_query = db.query(models.User).filter_by(id=id)
     user = user_query.first()
     if user:
@@ -30,7 +30,7 @@ def get_user(id: UUID, db: Session = Depends(get_db), current_user: int = Depend
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"No user with the id: {id}")
 
 @router.delete("/delete_user/{id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_user(id: UUID, db: Session = Depends(get_db), current_user: int = Depends(oauth2.get_current_user)):
+def delete_user(id: UUID, db: Session = Depends(get_db), current_user: int = Depends(oauth2.get_all_current_user)):
     user_query = db.query(models.User).filter_by(id=id)
     user = user_query.first()
 
