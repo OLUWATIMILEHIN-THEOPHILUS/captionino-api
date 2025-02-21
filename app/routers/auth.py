@@ -226,7 +226,7 @@ async def forgot_password(user_data: schemas.ForgotPassword, db: Session = Depen
     
     # create reset token and reset link
     reset_token = oauth2.create_reset_token(email={"sub": user.email})
-    reset_link = f"http://127.0.0.1:8000/auth/reset_password?token={reset_token}"
+    reset_link = f"https://dev-captionino-api.onrender.com/auth/reset_password?token={reset_token}"
 
     # send email with the reset link
     await utils.send_email(user.email, "Password Reset Request", f"Click here to reset your password: {reset_link}")

@@ -12,7 +12,7 @@ app = FastAPI()
 
 app.add_middleware(SessionMiddleware, secret_key=settings.secret_key)    #for google auth 
 
-origins = ["http://192.168.100.34:3000", "http://localhost:3000"]
+origins = ["http://192.168.100.34:3000", "http://localhost:3000", "https://captionino-frontend.pages.dev/"]
 
 app.add_middleware(
     CORSMiddleware,
