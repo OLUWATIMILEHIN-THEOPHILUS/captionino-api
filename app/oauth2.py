@@ -45,31 +45,43 @@ def verify_access_token(token: str, credentials_exception):
 
     return token_data
 
-def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+# For App Auth
+def get_current_user(app_token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
     credentials_exception = HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=f"Could not validate credentials!", headers={"WWW-Authentication": "Bearer"})
 
-    token = verify_access_token(token, credentials_exception)
+    token = verify_access_token(app_token, credentials_exception)
     user = db.query(models.User).filter_by(id=token.id).first()
     return user
 
 
 # For Supabase Auth
-async def get_current_supabase_user(token: str = Security(security)):
-    # verify Supabase JWT token and return user details
+async def get_current_supabase_user(supabase_token: str = Security(security)):
+    # verify Supabase JWT token and return user details.
     try:
-        user = supabase.auth.get_user(token.credentials)
+        user = supabase.auth.get_user(supabase_token.credentials)
         if not user:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
         return user
     except Exception:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authentication")
 
-# Combined get user logic
-def get_all_current_user():
+# For both App and Supabase users
+async def get_all_current_user(app_token: str = Depends(oauth2_scheme), supabase_token: str = Security(security), db: Session = Depends(get_db)):    
     try:
-        get_current_user()
+        print("Trying App authentication!!!")
+        return get_current_user(app_token=app_token, db=db)
     except:
-        get_current_supabase_user()
+        print("App Authenication failed!")
+    
+    try:
+        print("Trying Supabase authentication!!!")
+        supabase_user = await get_current_supabase_user(supabase_token=supabase_token)
+        user = db.query(models.User).filter_by(google_id=supabase_user.user.user_metadata['sub']).first()
+        return user
+
+    except Exception:
+        print("Supabase Authentication failed!")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=f"Authenication failed!")
 
 # For password reset
 def create_reset_token(email: dict):

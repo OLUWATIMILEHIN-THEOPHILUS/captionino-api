@@ -19,7 +19,7 @@ def get_all_users(db: Session = Depends(get_db)):
     }
 
 @router.get("/get_user/{id}", status_code=status.HTTP_200_OK, response_model=dict)
-def get_user(id: UUID, db: Session = Depends(get_db), current_user: int = Depends(oauth2.get_all_current_user)):
+def get_user(id: UUID, db: Session = Depends(get_db)):
     user_query = db.query(models.User).filter_by(id=id)
     user = user_query.first()
     if user:
@@ -33,7 +33,6 @@ def get_user(id: UUID, db: Session = Depends(get_db), current_user: int = Depend
 def delete_user(id: UUID, db: Session = Depends(get_db), current_user: int = Depends(oauth2.get_all_current_user)):
     user_query = db.query(models.User).filter_by(id=id)
     user = user_query.first()
-
     if user is not None:   
         if current_user.id == user.id:
             user_query.delete(synchronize_session=False)
