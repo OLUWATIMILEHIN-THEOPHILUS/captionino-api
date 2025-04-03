@@ -1,8 +1,13 @@
-# Hash, verify password and send_email here.
+# Hash, verify password, send_email and other utility functions here (subscription check).
 from passlib.context import CryptContext
 import smtplib
 from email.message import EmailMessage
 from .config import settings
+from sqlalchemy.orm import Session
+from . import models
+from fastapi import Depends
+from .database import get_db
+from datetime import datetime, timezone
 
 # For SMTP (Mailtrap Email testing).
 SMTP_SERVER = settings.smtp_server
