@@ -66,22 +66,23 @@ async def google_auth_callback(request: Request, db: Session = Depends(get_db)):
             db.commit()
             db.refresh(new_user)
             user = new_user
+
             # generate JWT token for new_user
             access_token = oauth2.create_access_token(data={"sub": str(new_user.id)})
             token_type = "bearer"
 
             return {
-            "message": "User created successfully!",
-            "user": schemas.UserResponse.from_orm(new_user),
-            "token": schemas.Token(access_token=access_token, token_type=token_type)
+                "message": "User created successfully!",
+                "user": schemas.UserResponse.from_orm(new_user),
+                "token": schemas.Token(access_token=access_token, token_type=token_type)
             }
         # generate JWT token for existing user
         access_token = oauth2.create_access_token(data={"sub": str(user.id)})
         token_type = "bearer"
 
         return {
-        "message": "User signed in successfully!",
-        "token": schemas.Token(access_token=access_token, token_type=token_type)
+            "message": "User signed in successfully!",
+            "token": schemas.Token(access_token=access_token, token_type=token_type)
         }
 
     except Exception as e:

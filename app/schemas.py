@@ -1,9 +1,11 @@
 # Schemas and response validation here.
-from pydantic import BaseModel, EmailStr, validator
+from pydantic import BaseModel, EmailStr, field_validator
 from uuid import UUID
 from datetime import datetime
 from typing import List, Optional, AnyStr
 import re
+from fastapi import Form
+# from enum import Enum
 
 # Pre-compile regex patterns for password validation
 LETTER_REGEX = re.compile(r'[A-Za-z]')
@@ -26,7 +28,7 @@ def validate_password(value: AnyStr) -> AnyStr:
 class PasswordMixin(BaseModel):
     password: str
 
-    @validator("password")
+    @field_validator("password")
     def check_password(cls, value):
         return validate_password(value)
 
@@ -77,3 +79,45 @@ class ForgotPassword(UserBase):
 class ResetPassword(PasswordMixin):
     token: str
     password_confirm: str
+
+# class CaptionType(str, Enum):
+#     social_media = "social media"
+#     product_description = "product description"
+#     travel = "travel"
+#     food = "food"
+
+class CaptionRequest(BaseModel):
+    c_type: Optional[str] = "Social Media"
+    c_instruction: Optional[str] = ""
+
+    @classmethod
+    def as_form(cls, c_type: str = Form("Social Media"), c_instruction: str = Form("")):
+        c_type = c_type.strip() or "Social Media"
+        c_instruction = c_instruction.strip() or ""
+        return cls(c_type=c_type, c_instruction=c_instruction)
+
+class CaptionResponse(BaseModel):
+    id: UUID
+    user_id: UUID
+    image_url: str
+    c_text: str
+    c_type: str
+    created: datetime
+
+    model_config = {
+        'from_attributes': True
+    }
+
+class CaptionsResponse(BaseModel):
+    count: int
+    captions: List[CaptionResponse]
+
+    model_config = {
+        "from_attributes": True
+    }
+
+class CaptionSaveRequest(BaseModel):
+    image_key: str
+    c_type: str
+    c_text: str
+    has_credits: bool

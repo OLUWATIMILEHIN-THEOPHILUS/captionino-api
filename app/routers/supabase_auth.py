@@ -5,6 +5,7 @@ from ..database import get_db
 from .. import schemas, models, oauth2
 from starlette.requests import Request
 from ..supabase_client import supabase
+from ..config import settings
 
 router = APIRouter(
     prefix="/auth",

@@ -20,6 +20,12 @@ class Settings(BaseSettings):
     smtp_port: int
     email_sender: str
     email_password: str
+    aws_access_key: str
+    aws_secret_key: str
+    aws_region: str
+    bucket_name: str
+    replicate_api_token: str
+
 
     class Config:
         env_file = ".env"

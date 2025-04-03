@@ -4,6 +4,8 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from .. import schemas, models, utils, oauth2
 from starlette.requests import Request
+from .google_auth import oauth
+from ..config import settings
 
 router = APIRouter(
     prefix="/auth",
