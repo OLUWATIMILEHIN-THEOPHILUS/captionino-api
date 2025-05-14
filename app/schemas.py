@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import List, Optional, AnyStr
 import re
 from fastapi import Form
-# from enum import Enum
+from . import enum
 
 # Pre-compile regex patterns for password validation
 LETTER_REGEX = re.compile(r'[A-Za-z]')
@@ -38,12 +38,22 @@ class UserBase(BaseModel):
 class UserCreate(UserBase, PasswordMixin):
     password_confirm: str
 
+class SaveUser(BaseModel):
+    timezone: str
+
 class UserResponse(UserBase):
     id: UUID
     created: datetime
+    avatar_url: Optional[str]
+    trials_left: int
+    subscription_status: str
+    daily_usage: int
+    timezone: str
+    captions: List["CaptionResponse"] = []
 
-    class Config:
-        from_attributes = True
+    model_config = {
+        "from_attributes": True
+    }
 
 class UsersResponse(BaseModel):
     count: int
@@ -80,19 +90,13 @@ class ResetPassword(PasswordMixin):
     token: str
     password_confirm: str
 
-# class CaptionType(str, Enum):
-#     social_media = "social media"
-#     product_description = "product description"
-#     travel = "travel"
-#     food = "food"
-
 class CaptionRequest(BaseModel):
-    c_type: Optional[str] = "Social Media"
+    c_type: Optional[str] = enum.CaptionType.social_media
     c_instruction: Optional[str] = ""
 
     @classmethod
-    def as_form(cls, c_type: str = Form("Social Media"), c_instruction: str = Form("")):
-        c_type = c_type.strip() or "Social Media"
+    def as_form(cls, c_type: str = Form(enum.CaptionType.social_media), c_instruction: str = Form("")):
+        c_type = c_type.strip() or enum.CaptionType.social_media
         c_instruction = c_instruction.strip() or ""
         return cls(c_type=c_type, c_instruction=c_instruction)
 
@@ -120,4 +124,5 @@ class CaptionSaveRequest(BaseModel):
     image_key: str
     c_type: str
     c_text: str
-    has_credits: bool
+    has_active_sub: bool
+    has_trials_left: bool

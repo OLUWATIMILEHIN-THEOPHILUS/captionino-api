@@ -36,7 +36,7 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete='CASCADE'),
         sa.Column("is_active", sa.Boolean, server_default="False", nullable=False),
         sa.Column("start_date", sa.TIMESTAMP(timezone=True), nullable=False, server_default=sa.text('now()')),
-        sa.Column("end_date", sa.DateTime, nullable=True),
+        sa.Column("end_date", sa.TIMESTAMP(timezone=True), nullable=False, server_default=sa.text('now()')),
     )
 
 

@@ -25,7 +25,9 @@ class Settings(BaseSettings):
     aws_region: str
     bucket_name: str
     replicate_api_token: str
-
+    max_trial: int
+    max_daily_usage: int
+    lemonsqueezy_webhook_secret: str
 
     class Config:
         env_file = ".env"

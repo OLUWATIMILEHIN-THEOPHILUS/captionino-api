@@ -1,7 +1,7 @@
 #  Authentication logics here
 from jose import jwt, JWTError
 from .config import settings
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from . import schemas, models
 from .database import get_db
 from fastapi.security import OAuth2PasswordBearer
@@ -24,8 +24,11 @@ RESET_TOKEN_EXPIRE_MINUTES = settings.reset_token_expire_minutes
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl='signin')
 
 def create_access_token(data: dict):
+
+    now = datetime.now(timezone.utc)
+
     to_encode = data.copy()
-    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    expire = now + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
 
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
@@ -81,13 +84,16 @@ async def get_all_current_user(app_token: str = Depends(oauth2_scheme), supabase
 
     except Exception:
         print("Supabase Authentication failed!")
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=f"Authenication failed!")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=f"Authentication failed!")
 
 # For password reset
 def create_reset_token(email: dict):
+
+    now = datetime.now(timezone.utc)
+
     to_encode = email.copy()
 
-    expire = datetime.utcnow() + timedelta(minutes=RESET_TOKEN_EXPIRE_MINUTES)
+    expire = now + timedelta(minutes=RESET_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
     # to_encode.update({"sub": email, "exp": expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)

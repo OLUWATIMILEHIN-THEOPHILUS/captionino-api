@@ -1,11 +1,12 @@
 # Caption generation logic here.
 from fastapi import APIRouter, status, UploadFile, File, Depends, HTTPException, Request
-from .. import schemas, oauth2, storage, models, utils
+from .. import schemas, oauth2, storage, models, utils, free_trials
 from ..database import get_db
 from sqlalchemy.orm import Session
 from ..config import settings
 import replicate
 from starlette.responses import JSONResponse
+from uuid import UUID
 
 router = APIRouter(
     prefix="/caption",
@@ -27,30 +28,51 @@ async def get_user_captions(db: Session = Depends(get_db),
         }
     else:
         return {
-            "message": "You have not generated any caption yet"
+            "message": "You have not generated any caption yet."
         }
 
+@router.get("/caption/{id}", status_code=status.HTTP_200_OK, response_model=dict)
+async def get_caption(id: UUID, db: Session = Depends(get_db),
+                           current_user: int = Depends(oauth2.get_all_current_user)):
+    
+    caption_query = db.query(models.Caption).filter(models.Caption.id == id)
+    caption = caption_query.first()
+    if caption:
+        if caption.user_id==current_user.id:
+            return {
+                "message": "Caption",
+                "caption": schemas.CaptionResponse.model_validate(caption)
+            }
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=f"You can only view your caption")
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Caption not found")
 
 @router.post("/generate-caption", status_code=status.HTTP_201_CREATED, response_model=dict)
 async def generate_caption(c_image: UploadFile = File(...), 
                            c_data: str = Depends(schemas.CaptionRequest.as_form),
                            db: Session = Depends(get_db),
                            current_user: int = Depends(oauth2.get_all_current_user)):
-    
-    has_credits = False 
-    user = db.query(models.User).filter_by(id=current_user.id).first()
-    if user.email == "oluwatimilehintheophilus@gmail.com":
-        has_credits = True
+    # subscription logic
+    has_active_sub = utils.check_active_subscription(user_id=current_user.id, db=db)
+    print(f"has_active_sub: {has_active_sub}")
 
-    if not has_credits:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=f"You do not have an active subscription or credits, please subscribe to continue generating captions!")
+    # daily limit logic
+    reached_daily_limit = utils.check_daily_limit_reached(user_id=current_user.id, has_active_sub=has_active_sub, db=db)
+    print(f"reached_daily_limit: {reached_daily_limit}")
+
+    # free trials logic
+    has_trials_left = free_trials.check_free_trial_eligibility(user_id=current_user.id, db=db)
+    print(f"has_trials_left: {has_trials_left}")
+
+    if not has_active_sub and not has_trials_left:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=f"No active subscription or free trial. Please subscribe to continue generating caption.")
+
+    if has_active_sub and reached_daily_limit:
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=f"Daily limit reached. Please try again tomorrow.")
 
     # Upload to temp storage first;
-
     temp_image_url, image_key = await storage.upload_temp_image(c_image)
 
     # Replicate caption generation 
-
     c_prompt = f"Generate a caption from this image, assuming it is for {c_data.c_type}."
     if c_data.c_instruction:
         c_prompt += f" {c_data.c_instruction}"
@@ -77,8 +99,8 @@ async def generate_caption(c_image: UploadFile = File(...),
     #     print(f"image deleted as caption failed: {image_key}")
     #     raise HTTPException(status_code=500, detail="Caption generation failed!")
 
-    # only if the user has credits/subscription, move the image into a permanent folder, and save the url into the database
-    # if has_credits:
+    # only if the user has active subscription, move the image into a permanent folder, and save the url into the database
+    # if has_active_sub:
     #     perm_image_url = await storage.move_image_permanently(image_key=image_key, user_id=current_user.id)
     #     print(f"image has been moved to permanent directory: {image_key}")
 
@@ -96,7 +118,7 @@ async def generate_caption(c_image: UploadFile = File(...),
     # else:
     #     storage.delete_image(image_key=image_key)
     #     print(f"image deleted after caption was generated for unsubscribed user: {image_key}")
-    #     raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=f"You do not have an active subscription or credits, please subscribe to continue generating captions!")
+    #     raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=f"No active subscription or free trial. Please subscribe to save your caption.")
 
     
     # return {
@@ -121,12 +143,30 @@ async def generate_caption(c_image: UploadFile = File(...),
         storage.delete_image(image_key)
         print(f"image deleted as caption failed: {image_key}")
         raise HTTPException(status_code=500, detail="Caption generation failed!")
+    
+    # Direct
+    if has_active_sub:
+        utils.increment_daily_usage(user_id=current_user.id, used_subscription=True, reached_daily_limit=reached_daily_limit, db=db)
+    else:
+        free_trials.decrement_trials_left(user_id=current_user.id, has_active_sub=has_active_sub, db=db)
+
+    # Bool
+    # used_free_trial = free_trials.decrement_trials_left(current_user.id, has_active_sub, db)
+
+    # if not used_free_trial:
+    #     utils.increment_daily_usage(current_user.id, used_subscription=True)
+
+    updated_has_trials_left = free_trials.check_free_trial_eligibility(user_id=current_user.id, db=db)
+    updated_reached_daily_limit = utils.check_daily_limit_reached(user_id=current_user.id, has_active_sub=has_active_sub, db=db)
 
     return JSONResponse(content={
         'url': prediction.urls['stream'],
         'image_key': image_key,
         'c_type': c_data.c_type,
-        'has_credits': has_credits
+        'has_active_sub': has_active_sub,
+        'has_trials_left': has_trials_left,
+        'updated_has_trials_left': updated_has_trials_left,
+        'updated_reached_daily_limit': updated_reached_daily_limit 
     })
 
 
@@ -134,8 +174,9 @@ async def generate_caption(c_image: UploadFile = File(...),
 async def save_caption(c_data: schemas.CaptionSaveRequest, db: Session = Depends(get_db), current_user: int = Depends(oauth2.get_all_current_user)):
     
 
-    # only if has_credits/subscription, move the image into a permanent folder, and save the url into the database
-    if c_data.has_credits:
+    # only if has_active_sub, move the image into a permanent folder, and save the url into the database.
+    if c_data.has_active_sub:
+        print(f"c_data_has_active_sub: {c_data.has_active_sub}")
         perm_image_url = await storage.move_image_permanently(image_key=c_data.image_key, user_id=current_user.id)
         print(f"image has been moved to permanent directory: {c_data.image_key}")
 
@@ -146,10 +187,10 @@ async def save_caption(c_data: schemas.CaptionSaveRequest, db: Session = Depends
         db.refresh(new_caption)
         
         return {
-            "message": "Caption generated successfully!",
+            "message": "Caption saved successfully!",
             "caption": schemas.CaptionResponse.model_validate(new_caption)
         }
     else:
         storage.delete_image(image_key=c_data.image_key)
         print(f"image deleted after caption was generated for unsubscribed user: {c_data.image_key}")
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=f"You do not have an active subscription or credits, please subscribe to continue generating captions!")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=f"No active subscription. Please subscribe to save your caption.")
