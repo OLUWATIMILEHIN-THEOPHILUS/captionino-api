@@ -74,7 +74,7 @@ async def get_all_current_user(app_token: str = Depends(oauth2_scheme), supabase
         print("Trying App authentication!!!")
         return get_current_user(app_token=app_token, db=db)
     except:
-        print("App Authenication failed!")
+        print("App Authentication failed!")
     
     try:
         print("Trying Supabase authentication!!!")
