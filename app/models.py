@@ -22,6 +22,8 @@ class User(Base):
     timezone = Column(String, default="Africa/Lagos")
     lemonsqueezy_customer_id = Column(String, nullable=True)
     lemonsqueezy_subscription_id = Column(String, nullable=True)
+    subscription_ends_at = Column(TIMESTAMP(timezone=True), nullable=True)
+    subscription_renews_at = Column(TIMESTAMP(timezone=True), nullable=True)
 
     captions = relationship('Caption', back_populates='owner')
 

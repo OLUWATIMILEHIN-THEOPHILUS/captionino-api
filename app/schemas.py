@@ -49,6 +49,9 @@ class UserResponse(UserBase):
     subscription_status: str
     daily_usage: int
     timezone: str
+    lemonsqueezy_subscription_id: Optional[int] = None
+    subscription_ends_at: Optional[datetime] = None
+    subscription_renews_at: Optional[datetime] = None
     captions: List["CaptionResponse"] = []
 
     model_config = {
@@ -126,3 +129,7 @@ class CaptionSaveRequest(BaseModel):
     c_text: str
     has_active_sub: bool
     has_trials_left: bool
+
+class CancelRequest(BaseModel):
+    subscription_id: int
+    action: str

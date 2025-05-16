@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     max_trial: int
     max_daily_usage: int
     lemonsqueezy_webhook_secret: str
+    lemonsqueezy_api_key: str
 
     class Config:
         env_file = ".env"
