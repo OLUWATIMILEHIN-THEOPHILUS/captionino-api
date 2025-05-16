@@ -73,7 +73,17 @@ async def generate_caption(c_image: UploadFile = File(...),
     temp_image_url, image_key = await storage.upload_temp_image(c_image)
 
     # Replicate caption generation 
-    c_prompt = f"Generate a caption from this image, assuming it is for {c_data.c_type}."
+    if c_data.c_type == "social media":
+        c_prompt = "generate a caption for this image, assuming it is for a social media post, e.g instagram post, facebook post, whatsapp status, twitter  e.t.c. make it short and poetic if need be."
+    elif c_data.c_type == "product description":
+        c_prompt = "generate a caption for this image, assuming it is for a product description. make it convincing and descriptive."
+    elif c_data.c_type == "travel":
+        c_prompt = "generate a caption for this image, assuming it is relating to travel. include location and notable place detected if need be."
+    elif c_data.c_type == "food":
+        c_prompt = "generate a caption for this image, assuming it is relating to food. include food description, health benefits, history e.t.c. if need be."
+    # elif c_data.c_type == "receipt":
+    #     c_prompt = "extract and return a structerd texts and figures from the image if it is a receipt, else generate a caption for it relating to receipt."
+
     if c_data.c_instruction:
         c_prompt += f" {c_data.c_instruction}"
 

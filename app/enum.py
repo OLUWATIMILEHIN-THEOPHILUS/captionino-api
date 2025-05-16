@@ -8,14 +8,10 @@ class CaptionType(str, PyEnum):
     product_description = "product description"
     travel = "travel"
     food = "food"
+    # receipt = "receipt"
 
 class SubscriptionStatus(PyEnum):
     FREE = "FREE"
     ACTIVE = "ACTIVE"
     EXPIRED = "EXPIRED"
-    PENDING = "PENDING"
-
-class PaymentStatus(PyEnum):
-    SUCCESS = "SUCCESS"
-    PENDING = "PENDING"
-    FAILED = "FAILED"
+    CANCELLED = "CANCELLED"
