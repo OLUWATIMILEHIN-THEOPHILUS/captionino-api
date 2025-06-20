@@ -7,6 +7,7 @@ from ..config import settings
 import replicate
 from starlette.responses import JSONResponse
 from uuid import UUID
+from fastapi.encoders import jsonable_encoder
 
 router = APIRouter(
     prefix="/caption",
@@ -24,7 +25,7 @@ async def get_user_captions(db: Session = Depends(get_db),
         captions = caption_query.all()
         return {
             "message": "Your captions",
-            "captions": schemas.CaptionsResponse(count=len(captions), captions=captions)
+            "captions": jsonable_encoder(schemas.CaptionsResponse(count=len(captions), captions=captions))
         }
     else:
         return {
@@ -41,7 +42,7 @@ async def get_caption(id: UUID, db: Session = Depends(get_db),
         if caption.user_id==current_user.id:
             return {
                 "message": "Caption",
-                "caption": schemas.CaptionResponse.model_validate(caption)
+                "caption": jsonable_encoder(schemas.CaptionResponse.model_validate(caption))
             }
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=f"You can only view your caption")
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Caption not found")
@@ -53,15 +54,15 @@ async def generate_caption(c_image: UploadFile = File(...),
                            current_user: int = Depends(oauth2.get_all_current_user)):
     # subscription logic
     has_active_sub = utils.check_active_subscription(user_id=current_user.id, db=db)
-    print(f"has_active_sub: {has_active_sub}")
+    # print(f"has_active_sub: {has_active_sub}")
 
     # daily limit logic
     reached_daily_limit = utils.check_daily_limit_reached(user_id=current_user.id, has_active_sub=has_active_sub, db=db)
-    print(f"reached_daily_limit: {reached_daily_limit}")
+    # print(f"reached_daily_limit: {reached_daily_limit}")
 
     # free trials logic
     has_trials_left = free_trials.check_free_trial_eligibility(user_id=current_user.id, db=db)
-    print(f"has_trials_left: {has_trials_left}")
+    # print(f"has_trials_left: {has_trials_left}")
 
     if not has_active_sub and not has_trials_left:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=f"No active subscription or free trial. Please subscribe to continue generating caption.")
@@ -72,22 +73,76 @@ async def generate_caption(c_image: UploadFile = File(...),
     # Upload to temp storage first;
     temp_image_url, image_key = await storage.upload_temp_image(c_image)
 
-    # Replicate caption generation 
+    # Replicate caption generation prompts.
     if c_data.c_type == "social media":
-        c_prompt = "generate a caption for this image, assuming it is for a social media post, e.g instagram post, facebook post, whatsapp status, twitter  e.t.c. make it short and poetic if need be."
-    elif c_data.c_type == "product description":
-        c_prompt = "generate a caption for this image, assuming it is for a product description. make it convincing and descriptive."
-    elif c_data.c_type == "travel":
-        c_prompt = "generate a caption for this image, assuming it is relating to travel. include location and notable place detected if need be."
-    elif c_data.c_type == "food":
-        c_prompt = "generate a caption for this image, assuming it is relating to food. include food description, health benefits, history e.t.c. if need be."
-    # elif c_data.c_type == "receipt":
-    #     c_prompt = "extract and return a structerd texts and figures from the image if it is a receipt, else generate a caption for it relating to receipt."
+        c_prompt = (
+            "Instruction: You are a modern social media caption writer with a poetic and vibey style. "
+            "Write a short, aesthetic caption using stylized sentence fragments but avoids storytelling or full sentences."
+            "Do not start with 'a', 'this is a' or other generic starters."
+            "Use evocative, fragment-style language instead of full descriptions."
+            # "Avoid using 'a', 'this', 'he', 'his', 'it', or full sentences or other generic starters or phrasing like 'as he...', 'making it...'. "
+            "Think like an Instagram or TikTok user dropping a cool caption — punchy, vibey, poetic."
+            # "Tone: poetic, confident, stylish, vibey — like something someone would actually post on Instagram or TikTok. "
+            "Tone: confident, playful, stylish, and relatable. "
+            "Format: sentence fragments, aesthetic lines, or even poetic stanzas. "
+            "Include commas and punctuation for rhythm. Do not write more than 4-5 lines. "
+            "Examples: 'Feathered elegance, no apologies. Swagger turned up.' or 'Dapper duck and bow tie swagger. Waddling in style. 'Not your average duck.''"
+        )
 
+    elif c_data.c_type == "product description":
+        c_prompt = (
+            "Instruction: You are a product caption specialist with a knack for making items sound desirable and stylish. "
+            "Write a caption, not too long, in aesthetic fragments — avoid full sentences. "
+            # "No use of 'a', 'this', 'it', or generic phrases. "
+            "Keep it persuasive but informal. Use sentence fragments if they add flair. "
+            # "Focus on mood, features, or standout details in a catchy, minimal way but somehow descriptive. "
+            "Highlight visual appeal, feel, or benefits of the product without sounding robotic. "
+            "Tone: minimal, stylish, modern, and aspirational. "
+            "Avoid: generic phrases, hard sells, or long sentences."
+            # "Use commas or short punchy lines for rhythm. "
+            "Examples: 'Crafted to stand out. Minimal, not basic....' or 'Clean lines, loud presence.'"
+        )
+
+    elif c_data.c_type == "travel":
+        c_prompt = (
+            "Instruction: You are a poetic travel influencer writing vibey location captions. "
+            # "Write a caption, not too long, in aesthetic fragments — not full sentences or diary-style writing. "
+            "Focus on mood, emotion, and vibes over full storytelling. "
+            "Use sentence fragments or poetic lines. "
+            "Avoid phrases like 'this place', 'I went to'. No narrative or passive voice or listicle-style narration."
+            "Tone: dreamy, inspiring, visual. "
+            "Capture atmosphere, mood, and scenery in punchy lines with commas or stops. "
+            "Examples: 'Golden skies, wind-kissed cliffs and view of comforting nature.' or 'Wander mode, always on.'"
+        )
+
+    elif c_data.c_type == "food":
+        c_prompt = (
+            "Instruction: You are a food blogger writing fun, stylish captions for dishes. "
+            # "Use sentence fragments only — not reviews, not stories. "
+            "Use sensory, playful language to describe the dish's vibe, flavor, or aesthetic. "
+            "Avoid full recipe-like descriptions. Use short, punchy fragments. "
+            "Avoid words like 'this', 'a dish', 'it’s made of'. Highlight vibe, flavor, experience. "
+            "Tone: indulgent, witty, food-porn-esque, playful, delicious, visual. Use short stanzas or fragments, max 4-5 lines. "
+            "Examples: 'Spice meets sauce. Fork can’t wait and the mouth with no patience. One bite, and you're in love.' or 'Crunch, drizzle, gone.'"
+        )
+
+    # elif c_data.c_type == "receipt":
+    #     c_prompt = (
+    #         "Instruction: You are an intelligent OCR agent specialized in analyzing receipts. "
+    #         "If the image is clearly a receipt, extract and return structured JSON with: 'merchant', 'date', 'items' (list of name, qty, price), 'subtotal', 'tax', and 'total'. "
+    #         "If the image is not a clear receipt, generate a short, poetic-style caption about daily expenses or spending vibes. "
+    #         "Use sentence fragments only. Avoid 'this', 'it', or narrative lines. "
+    #         "Examples: 'Grocery vibes. Little wins, big bites.' or 'Receipts stack, stories untold.'"
+    #         "Respond in plain text, not markdown or code block format."
+    #     )
+
+    # Optional Instruction
     if c_data.c_instruction:
         c_prompt += f" {c_data.c_instruction}"
 
-                                            # OUTPUT
+
+
+                                            # USING OUTPUT
     # input = {
     # "image": temp_image_url,
     # "prompt": c_prompt
@@ -109,35 +164,17 @@ async def generate_caption(c_image: UploadFile = File(...),
     #     print(f"image deleted as caption failed: {image_key}")
     #     raise HTTPException(status_code=500, detail="Caption generation failed!")
 
-    # only if the user has active subscription, move the image into a permanent folder, and save the url into the database
-    # if has_active_sub:
-    #     perm_image_url = await storage.move_image_permanently(image_key=image_key, user_id=current_user.id)
-    #     print(f"image has been moved to permanent directory: {image_key}")
-
-    #     new_caption = models.Caption(user_id=current_user.id, text=result["c_text"], image_url=perm_image_url) #type=type
-
-    #     db.add(new_caption)
-    #     db.commit()
-    #     db.refresh(new_caption)
-        
-    #     return {
-    #         "message": "Caption generated successfully!",
-    #         "caption": result,
-    #         "saved_caption": schemas.CaptionResponse.model_validate(new_caption)
-    #     }
-    # else:
-    #     storage.delete_image(image_key=image_key)
-    #     print(f"image deleted after caption was generated for unsubscribed user: {image_key}")
-    #     raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=f"No active subscription or free trial. Please subscribe to save your caption.")
-
-    
-    # return {
-    #     "message": "Caption generated successfully!",
+    # return JSONResponse(content={
     #     "caption": result
-    # }
+    #     'image_key': image_key,
+    #     'c_type': c_data.c_type,
+    #     'has_active_sub': has_active_sub,
+    #     'has_trials_left': has_trials_left,
+    #     'reached_daily_limit': reached_daily_limit
+    # })
 
 
-                                            # STREAMING
+                                            # USING STREAMING
     input = {
     "image": temp_image_url,
     "prompt": c_prompt
@@ -151,56 +188,65 @@ async def generate_caption(c_image: UploadFile = File(...),
 
     if prediction is None or not hasattr(prediction, 'urls'):
         storage.delete_image(image_key)
-        print(f"image deleted as caption failed: {image_key}")
+        # print(f"image deleted as caption failed: {image_key}")
         raise HTTPException(status_code=500, detail="Caption generation failed!")
-    
-    # Direct
-    if has_active_sub:
-        utils.increment_daily_usage(user_id=current_user.id, used_subscription=True, reached_daily_limit=reached_daily_limit, db=db)
-    else:
-        free_trials.decrement_trials_left(user_id=current_user.id, has_active_sub=has_active_sub, db=db)
-
-    # Bool
-    # used_free_trial = free_trials.decrement_trials_left(current_user.id, has_active_sub, db)
-
-    # if not used_free_trial:
-    #     utils.increment_daily_usage(current_user.id, used_subscription=True)
-
-    updated_has_trials_left = free_trials.check_free_trial_eligibility(user_id=current_user.id, db=db)
-    updated_reached_daily_limit = utils.check_daily_limit_reached(user_id=current_user.id, has_active_sub=has_active_sub, db=db)
 
     return JSONResponse(content={
         'url': prediction.urls['stream'],
+        # 'cancel': prediction.urls['cancel'],
         'image_key': image_key,
         'c_type': c_data.c_type,
         'has_active_sub': has_active_sub,
         'has_trials_left': has_trials_left,
-        'updated_has_trials_left': updated_has_trials_left,
-        'updated_reached_daily_limit': updated_reached_daily_limit 
+        'reached_daily_limit': reached_daily_limit
     })
 
 
 @router.post("/save-caption", status_code=status.HTTP_201_CREATED, response_model=dict)
 async def save_caption(c_data: schemas.CaptionSaveRequest, db: Session = Depends(get_db), current_user: int = Depends(oauth2.get_all_current_user)):
     
+    # Don't save or update quota if caption text is empty.
+    if not c_data.c_text.strip():
+        storage.delete_image(image_key=c_data.image_key)
+        # print(f"Caption was empty, image deleted: {c_data.image_key}")
+        raise HTTPException(status_code=400, detail="Caption is empty, nothing was saved.")
 
     # only if has_active_sub, move the image into a permanent folder, and save the url into the database.
     if c_data.has_active_sub:
-        print(f"c_data_has_active_sub: {c_data.has_active_sub}")
+        # print(f"c_data_has_active_sub: {c_data.has_active_sub}")
         perm_image_url = await storage.move_image_permanently(image_key=c_data.image_key, user_id=current_user.id)
-        print(f"image has been moved to permanent directory: {c_data.image_key}")
+        # print(f"image has been moved to permanent directory: {c_data.image_key}")
 
         new_caption = models.Caption(user_id=current_user.id, c_text=c_data.c_text, image_url=perm_image_url, c_type=c_data.c_type)
 
         db.add(new_caption)
         db.commit()
         db.refresh(new_caption)
+
+        # Increament daily usage after caption was successful and saved.
+        utils.increment_daily_usage(user_id=current_user.id, used_subscription=True, reached_daily_limit=c_data.reached_daily_limit, db=db)
         
-        return {
+        # Get updated daily limit and send to the frontend.
+        updated_reached_daily_limit = utils.check_daily_limit_reached(user_id=current_user.id, has_active_sub=c_data.has_active_sub, db=db)
+
+        return JSONResponse(content={
             "message": "Caption saved successfully!",
-            "caption": schemas.CaptionResponse.model_validate(new_caption)
-        }
+            "caption": jsonable_encoder(schemas.CaptionResponse.model_validate(new_caption)),
+            'updated_reached_daily_limit': updated_reached_daily_limit 
+        })
+
     else:
         storage.delete_image(image_key=c_data.image_key)
-        print(f"image deleted after caption was generated for unsubscribed user: {c_data.image_key}")
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=f"No active subscription. Please subscribe to save your caption.")
+        # print(f"image deleted after caption was generated for unsubscribed user: {c_data.image_key}")
+
+        # Decreament free trials after caption was successful and saved.
+        free_trials.decrement_trials_left(user_id=current_user.id, has_active_sub=c_data.has_active_sub, db=db)
+
+        # Get updated free trials and send to the frontend.
+        updated_has_trials_left = free_trials.check_free_trial_eligibility(user_id=current_user.id, db=db)
+
+        return JSONResponse(content={
+            "message": "Caption not saved. No active subscription.",
+            'updated_has_trials_left': updated_has_trials_left, 
+            'status': status.HTTP_402_PAYMENT_REQUIRED
+        })

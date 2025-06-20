@@ -129,6 +129,7 @@ class CaptionSaveRequest(BaseModel):
     c_text: str
     has_active_sub: bool
     has_trials_left: bool
+    reached_daily_limit: bool
 
 class CancelRequest(BaseModel):
     subscription_id: int
