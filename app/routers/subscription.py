@@ -24,8 +24,8 @@ async def subscription_webhook(request: Request, db: Session = Depends(get_db)):
     # Parse payload
     payload = json.loads(body)
 
-    print("Full Payload:")
-    print(json.dumps(payload, indent=2))  # Print for debugging
+    # print("Full Payload:")
+    # print(json.dumps(payload, indent=2))  # Print for debugging
 
     event_type = payload.get("meta", {}).get("event_name")
     subscription_data = payload.get("data", {}).get("attributes", {})
@@ -113,7 +113,7 @@ async def cancel_subscription(user_data: schemas.CancelRequest, current_user: in
     }
 
     async with httpx.AsyncClient() as client:
-        response = await client.patch(f"https://api.lemonsqueezy.com/v1/subscriptions/{subscription_id}", json=payload, headers=headers)
+        response = await client.patch(f"{settings.lemonsqueezy_subscription_url}/{subscription_id}", json=payload, headers=headers)
 
     if response.status_code != 200:
         print("LemonSqueezy Error:", response.text)

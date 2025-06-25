@@ -43,6 +43,7 @@ class Settings(BaseSettings):
     
     lemonsqueezy_webhook_secret: str
     lemonsqueezy_api_key: str
+    lemonsqueezy_subscription_url: str
 
     class Config:
         env_file = ".env"

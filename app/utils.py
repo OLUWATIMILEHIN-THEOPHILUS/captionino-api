@@ -45,7 +45,7 @@ def check_active_subscription(user_id: int, db: Session = Depends(get_db)):
 
     sub_status = user.subscription_status 
 
-    if sub_status == "ACTIVE":
+    if sub_status == "ACTIVE" or sub_status == "CANCELLED":
         return True
     return False
 
